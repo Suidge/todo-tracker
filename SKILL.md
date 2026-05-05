@@ -1,104 +1,48 @@
 ---
 name: Todo Tracker
-version: 1.2.0
-description: Manage follow-up items and remind users at appropriate times via heartbeat checks.
-changelog: |
-  v1.2.0 - Added HARD CONSTRAINTS section: marking completed/cancelled MUST set completed_at/cancelled_at fields
-  v1.1.0 - Added cleanup script (scripts/todo-cleaner.py) for auto-deleting completed items after 24h
+slug: suidge-todo-tracker
+version: 1.3.0
+description: Manage follow-up items and remind users during heartbeat checks.
 metadata:
-  clawdbot:
+  openclaw:
     emoji: "📋"
     requires:
       bins: []
     os: ["linux", "darwin", "win32"]
 ---
 
-## Setup
-
-On first use, copy `templates/todo.json` to `memory/todo.json`. Update `HEARTBEAT.md` and `AGENTS.md` with trigger rules. See `setup.md` for details.
+# Todo Tracker
 
 ## When to Use
 
-User mentions reminders, follow-ups, or todos. Agent proactively checks pending items during heartbeat cycles.
-
-## Quick Reference
-
-| Topic | File |
-|-------|------|
-| Installation steps | `setup.md` |
-| Data structure | `data-structure.md` |
-| Usage examples | `examples.md` |
-| Cleanup script | `scripts/todo-cleaner.py` |
+用户提到提醒、跟进、待办事项。心跳周期自动检查 pending 事项。
 
 ## Core Rules
 
-### 🚨 HARD CONSTRAINTS (Must Follow)
+1. **单一数据源** — 所有事项存储在 `memory/todo.json`
+2. **心跳检查** — 每 30 分钟检查 `status=pending` 且 `follow_up_time` 已到 → 提醒用户（持续提醒直到完成）
+3. **完成/取消必须设时间戳** — `completed` 设 `completed_at`，`cancelled` 设 `cancelled_at`（ISO 8601）
+4. **24 小时自动清理** — 已完成/取消超过 24 小时的事项由 `scripts/todo-cleaner.py` 删除
+5. **信息不全要追问** — 用户说"明天提醒我"但没说时间 → 追问"几点？"
 
-**When marking a todo as completed or cancelled, you MUST set the corresponding timestamp field**:
+## Quick Reference
 
-- `status=completed` → **MUST set `completed_at`** to current time (ISO 8601 with timezone)
-- `status=cancelled` → **MUST set `cancelled_at`** to current time (ISO 8601 with timezone)
-
-**Example**:
-```json
-{
-  "status": "completed",
-  "completed_at": "2026-04-16T13:40:00+08:00"  // ← REQUIRED!
-}
-```
-
-**Failure to set these fields will cause cleanup script to skip the item**, leaving completed tasks in todo.json indefinitely.
-
-**Why this matters**: The cleanup script (`scripts/todo-cleaner.py`) checks `completed_at` to determine if an item is older than 24 hours. Without this field, completed items will never be deleted.
-
----
-
-### 1. Store Items in `memory/todo.json`
-Single source of truth. Each item has: id, description, follow_up_time, status, priority, context.
-
-### 2. Check During Heartbeat
-Every heartbeat (30 min), check `status=pending` items. If `follow_up_time` reached, remind user (regardless of `reminded` flag — pending items should be reminded repeatedly until completed).
-
-### 3. Clean Up Completed Items
-Items with `status=completed` or `status=cancelled` are deleted after 24 hours.
-
-**Cleanup Script**: Run `scripts/todo-cleaner.py` to auto-delete old completed items.
 ```bash
-# Dry run (preview)
-python3 ~/.openclaw/workspace/skills/todo-tracker/scripts/todo-cleaner.py --dry-run
-
-# Execute cleanup
-python3 ~/.openclaw/workspace/skills/todo-tracker/scripts/todo-cleaner.py
+# 添加事项 → 写入 memory/todo.json，status=pending
+# 完成事项 → status=completed + completed_at
+# 取消事项 → status=cancelled + cancelled_at
+# 清理 → python3 scripts/todo-cleaner.py
 ```
-
-### 4. Time Precision is ~30 Minutes
-Reminders trigger at heartbeat intervals, not exact times. Plan accordingly.
-
-### 5. Prevent Duplicate Reminders
-Set `reminded=true` after reminding. Check this flag before reminding again.
-
-### 6. Ask for Missing Info
-If user says "remind me tomorrow" without specifics, ask: "What time tomorrow?"
-
-## Trigger Keywords
-
-| Intent | Examples |
-|--------|----------|
-| Add | "remind me...", "follow up...", "don't forget..." |
-| Complete | "done with...", "completed...", "no need to follow up" |
-| List | "show todos", "what do I need to follow up" |
-| Cancel | "cancel the reminder..." |
 
 ## Data Storage
 
-`memory/todo.json` — all todo items. See `data-structure.md` for schema.
+`memory/todo.json` — 所有事项。Schema 见 `data-structure.md`。
 
-## Feedback
+## Guides
 
-- If useful: `clawhub star suidge-todo-tracker`
-- Issues: Report via GitHub
-
----
-
-slug: suidge-todo-tracker
-homepage: https://github.com/Suidge/todo-tracker
+| Topic | File |
+|-------|------|
+| 安装配置 | `setup.md` |
+| 数据结构 | `data-structure.md` |
+| 使用示例 | `examples.md` |
+| 清理脚本 | `scripts/todo-cleaner.py` |
